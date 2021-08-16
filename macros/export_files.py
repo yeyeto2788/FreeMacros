@@ -5,9 +5,59 @@ import os
 from collections import namedtuple
 
 import FreeCAD
+import FreeCADGui
 import ImportGui
 import Mesh
 from PySide import QtCore, QtGui
+
+__dbg__ = False
+
+
+def console_message(msg):
+    """Print message in console
+
+    Args:
+        msg (str): Message to be printed
+    """
+    FreeCAD.Console.PrintMessage("\n")
+    FreeCAD.Console.PrintMessage(msg)
+
+
+def console_warning(msg):
+    """Print warning in console
+
+    Args:
+        msg (str): Message to be printed
+    """
+    FreeCAD.Console.PrintMessage("\n")
+    FreeCAD.Console.PrintWarning(msg)
+
+
+def console_error(msg):
+    """Print error in console
+
+    Args:
+        msg (str): Message to be printed
+    """
+    FreeCAD.Console.PrintMessage("\n")
+    FreeCAD.Console.PrintError(msg)
+
+
+def console_debug(msg):
+    """Print message in console
+
+    Args:
+        msg (str): Message to be printed
+    """
+    if __dbg__:
+        FreeCAD.Console.PrintMessage("\n")
+        FreeCAD.Console.PrintMessage("Debug : " + str(msg))
+
+
+if __dbg__:
+    # Clear report view in debug mode
+    FreeCADGui.getMainWindow().findChild(QtGui.QTextEdit, "Report view").clear()
+
 
 _statuses = {"FAIL": "FAIL", "SUCCESS": "SUCESS"}
 STATUS = namedtuple("status", _statuses.keys())(*_statuses)
