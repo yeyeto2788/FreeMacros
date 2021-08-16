@@ -1,0 +1,32 @@
+---
+- name: Install all macros on a given machine with FreeCAD installed.
+  hosts: localhost
+  connection: local
+
+  tasks:
+    - name: Check for existence of FreeCAD macros path.
+      find:
+        paths: "/"
+        patterns: "^.*Macro"
+        recurse: yes
+        file_type: directory
+        use_regex: yes
+      register: found_paths
+
+    - name: Register path variable.
+      set_fact:
+        macros_path: "{{ item.path }}"
+      when: "'.FreeCAD' in item.path"
+      loop: "{{ found_paths.files }}"
+
+    - name: Get latest release of Macros
+      debug:
+        msg: "git clone | curl"
+
+    - name: Copy or decompress
+      debug:
+        msg: "unzip | mv"
+
+    - name: Print gotten path
+      debug:
+        var: macros_path
