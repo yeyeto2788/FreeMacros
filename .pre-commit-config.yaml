@@ -6,7 +6,7 @@ repos:
     hooks:
       - id: sort_imports
         name: Sort library imports
-        entry: poetry run isort macros
+        entry: poetry run isort --force-single-line-imports macros
         pass_filenames: false
         language: system
         always_run: true
@@ -25,6 +25,16 @@ repos:
       - id: flake8
         name: Flake8 linting.
         entry: poetry run flake8 macros --config .flake8
+        pass_filenames: false
+        language: system
+        always_run: true
+
+  - repo: local
+    hooks:
+      - id: release
+        name: Create release Macro files.
+        entry: scripts/convert_files.py
+        pass_filenames: false
         language: system
         always_run: true
 
