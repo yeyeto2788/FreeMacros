@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""Export objects into STL and STEP format."""
 
 import os
 from collections import namedtuple
@@ -8,13 +9,16 @@ import FreeCAD
 import FreeCADGui
 import ImportGui
 import Mesh
-from PySide import QtCore, QtGui
+from PySide import QtCore
+from PySide import QtGui
 
-__dbg__ = False
+DEBUG = False
+_statuses = {"FAIL": "FAIL", "SUCCESS": "SUCESS"}
+STATUS = namedtuple("status", _statuses.keys())(*_statuses)
 
 
 def console_message(msg):
-    """Print message in console
+    """Print message in console.
 
     Args:
         msg (str): Message to be printed
@@ -24,7 +28,7 @@ def console_message(msg):
 
 
 def console_warning(msg):
-    """Print warning in console
+    """Print warning in console.
 
     Args:
         msg (str): Message to be printed
@@ -34,7 +38,7 @@ def console_warning(msg):
 
 
 def console_error(msg):
-    """Print error in console
+    """Print error in console.
 
     Args:
         msg (str): Message to be printed
@@ -44,23 +48,14 @@ def console_error(msg):
 
 
 def console_debug(msg):
-    """Print message in console
+    """Print message in console.
 
     Args:
         msg (str): Message to be printed
     """
-    if __dbg__:
+    if DEBUG:
         FreeCAD.Console.PrintMessage("\n")
         FreeCAD.Console.PrintMessage("Debug : " + str(msg))
-
-
-if __dbg__:
-    # Clear report view in debug mode
-    FreeCADGui.getMainWindow().findChild(QtGui.QTextEdit, "Report view").clear()
-
-
-_statuses = {"FAIL": "FAIL", "SUCCESS": "SUCESS"}
-STATUS = namedtuple("status", _statuses.keys())(*_statuses)
 
 
 def get_objects_to_export(document: FreeCAD.ActiveDocument):
@@ -75,10 +70,8 @@ def get_objects_to_export(document: FreeCAD.ActiveDocument):
     objects_to_export = list()
 
     for object in document.Objects:
-
-        if object.ViewObject.isVisible() and hasattr(
-            object.ViewObject, "Deviation"
-        ):  # should be a sketch
+        # Line added due to failing on export > hasattr(object.ViewObject, "Deviation")
+        if object.ViewObject.isVisible() and hasattr(object.ViewObject, "Deviation"):
             object.ViewObject.Deviation = 0.01
             object.ViewObject.AngularDeflection = 5.0
 
@@ -88,7 +81,7 @@ def get_objects_to_export(document: FreeCAD.ActiveDocument):
 
 
 def create_directories(directories: list):
-    """Create needed output directories if do not exists
+    """Create needed output directories if do not exists.
 
     Args:
         directories (list): List of paths to be created.
@@ -99,7 +92,7 @@ def create_directories(directories: list):
 
 
 def export_objects(objects: list, filename: str) -> bool:
-    """Simple function to export objects.
+    """Export objects to a given format based on the name.
 
     Basically done in order not to duplicate code.
 
@@ -110,19 +103,25 @@ def export_objects(objects: list, filename: str) -> bool:
     Returns:
         [bool]: Operation result
     """
-
     try:
         if filename.endswith("step"):
             ImportGui.export(objects, filename)
         else:
             Mesh.export(objects, filename)
+
         return True
     except TypeError as exec_error:
         print(exec_error)
         return False
 
 
-def create_dialog(msg, dialog_type: str):
+def create_dialog(msg: str, dialog_type: str):
+    """Create dialog window on the screen.
+
+    Args:
+        msg (str): Message to be displayed.
+        dialog_type (str): Type of dialog window.
+    """
     if dialog_type == "warning":
         box_type = QtGui.QMessageBox.Warning
     else:
@@ -133,7 +132,11 @@ def create_dialog(msg, dialog_type: str):
     diag.exec_()
 
 
-if __name__ == "__main__":
+def main():
+    """Executes the main logic of the application."""  # noqa: D401
+    if DEBUG:
+        # Clear report view in debug mode
+        FreeCADGui.getMainWindow().findChild(QtGui.QTextEdit, "Report view").clear()
     documents = FreeCAD.listDocuments()
     messages = list()
     overall_dialog_type = "info"
@@ -144,9 +147,10 @@ if __name__ == "__main__":
 
         # Get active document
         doc = FreeCAD.ActiveDocument
+
         doc_directory = os.path.dirname(doc.FileName)
-        step_folder = os.path.join(os.path.dirname(doc_directory), "STEP")
-        stl_folder = os.path.join(os.path.dirname(doc_directory), "STL")
+        step_folder = os.path.join(doc_directory, "STEP")
+        stl_folder = os.path.join(doc_directory, "STL")
 
         # Create directories if do not exists
         create_directories(directories=[step_folder, stl_folder])
@@ -183,4 +187,8 @@ if __name__ == "__main__":
         messages.append(message)
 
     overall_message = "\n\n".join(messages)
-    create_dialog(msg=overall_message, dialog_type=dialog_type)
+    create_dialog(msg=overall_message, dialog_type=overall_dialog_type)
+
+
+if __name__ == "__main__":
+    main()

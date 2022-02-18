@@ -1,61 +1,28 @@
 #! /usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""Create technical drawing pages based on the objects on the FreeCAD document."""
 import os
+import traceback
 
 import FreeCAD
 import FreeCADGui
 from PySide import QtGui
 
-__dbg__ = False
+DEBUG = True
 
 
-def console_message(msg):
-    """Print message in console
-
-    Args:
-        msg (str): Message to be printed
-    """
-    FreeCAD.Console.PrintMessage("\n")
-    FreeCAD.Console.PrintMessage(msg)
-
-
-def console_warning(msg):
-    """Print warning in console
-
-    Args:
-        msg (str): Message to be printed
-    """
-    FreeCAD.Console.PrintMessage("\n")
-    FreeCAD.Console.PrintWarning(msg)
-
-
-def console_error(msg):
-    """Print error in console
-
-    Args:
-        msg (str): Message to be printed
-    """
-    FreeCAD.Console.PrintMessage("\n")
-    FreeCAD.Console.PrintError(msg)
-
-
-def console_debug(msg):
-    """Print message in console
-
-    Args:
-        msg (str): Message to be printed
-    """
-    if __dbg__:
-        FreeCAD.Console.PrintMessage("\n")
-        FreeCAD.Console.PrintMessage("Debug : " + str(msg))
-
-
-if __dbg__:
-    # Clear report view in debug mode
-    FreeCADGui.getMainWindow().findChild(QtGui.QTextEdit, "Report view").clear()
-
-
-available_templates = {
+ALLOWED_BODIES = [
+    "PartDesign::AdditiveCone",
+    "PartDesign::AdditiveCylinder",
+    "PartDesign::Chamfer",
+    "PartDesign::Fillet",
+    "PartDesign::Pad",
+    "PartDesign::Pocket",
+    "PartDesign::PolarPattern",
+    "PartDesign::AdditiveCylinder",
+    "PartDesign::SubtractiveCylinder",
+]
+TEMPLATES = {
     0: "A0_Landscape_blank.svg",
     1: "A0_Landscape_ISO7200_Pep.svg",
     2: "A0_Landscape_ISO7200TD.svg",
@@ -103,6 +70,47 @@ available_templates = {
 }
 
 
+def console_message(msg: str):
+    """Print message in console.
+
+    Args:
+        msg (str): Message to be printed
+    """
+    FreeCAD.Console.PrintMessage("\n")
+    FreeCAD.Console.PrintMessage(msg)
+
+
+def console_warning(msg: str):
+    """Print warning in console.
+
+    Args:
+        msg (str): Message to be printed
+    """
+    FreeCAD.Console.PrintMessage("\n")
+    FreeCAD.Console.PrintWarning(msg)
+
+
+def console_error(msg):
+    """Print error in console.
+
+    Args:
+        msg (str): Message to be printed
+    """
+    FreeCAD.Console.PrintMessage("\n")
+    FreeCAD.Console.PrintError(msg)
+
+
+def console_debug(msg):
+    """Print message in console.
+
+    Args:
+        msg (str): Message to be printed
+    """
+    if DEBUG:
+        FreeCAD.Console.PrintMessage("\n")
+        FreeCAD.Console.PrintMessage("Debug : " + str(msg))
+
+
 def get_visible_objects(document: FreeCAD.ActiveDocument):
     """Get all visible objects to be exported.
 
@@ -116,69 +124,117 @@ def get_visible_objects(document: FreeCAD.ActiveDocument):
 
     for object in document.Objects:
 
-        if object.ViewObject.isVisible() and hasattr(
-            object.ViewObject, "Deviation"
+        if (
+            object.ViewObject.isVisible()
+            and hasattr(object.ViewObject, "Deviation")
+            and str(object.TypeId) in ALLOWED_BODIES
         ):  # should be a sketch
             objects_to_export.append(object)
 
     return objects_to_export
 
 
-# Fit view to screen
-FreeCAD.Gui.SendMsgToActiveView("ViewFit")
-# Set the view to be front view
-FreeCAD.Gui.activeDocument().activeView().viewFront()
-current_document = FreeCAD.ActiveDocument
-visible_objects = get_visible_objects(document=current_document)
+def create_technical_page(
+    document: FreeCAD.ActiveDocument, object, page_name: str, template_dir: str
+):
+    """Create technical page using a template and assinging projection groups to it.
 
-templates_dir = os.path.join(
-    FreeCAD.ConfigGet("AppHomePath"), "share", "Mod", "TechDraw", "Templates"
-)
-template_filename = available_templates[16]
-template_full_dir = os.path.join(templates_dir, template_filename)
-
-for index, object in enumerate(visible_objects):
-    page_name = f"Page{index}"
+    Args:
+        document (FreeCAD.ActiveDocument): Document on which to create the technical pages.
+        object (_type_): _description_
+        page_name (str): Name for the page.
+        template_dir (str): Path to the template to use.
+    """
     # Select visible object that would be use to generate the page of.
-    FreeCAD.Gui.Selection.addSelection(current_document.Name, object.Name)
-    # Add a page based on a template.
-    FreeCAD.activeDocument().addObject("TechDraw::DrawPage", page_name)
-    FreeCAD.activeDocument().addObject("TechDraw::DrawSVGTemplate", "Template")
-    FreeCAD.activeDocument().Template.Template = template_full_dir
-    # `__getattribute__` dunder method used in order to retrieve the page created.
-    FreeCAD.activeDocument().__getattribute__(
-        page_name
-    ).Template = FreeCAD.activeDocument().Template
+    FreeCAD.Gui.Selection.addSelection(document.Name, object.Name)
+    # Add a technical page based on a template.
+    page_obj = FreeCAD.activeDocument().addObject("TechDraw::DrawPage", page_name)
+    template_obj = FreeCAD.activeDocument().addObject(
+        "TechDraw::DrawSVGTemplate", f"Template_{object.Label}"
+    )
+    # Assign template of the template from directory.
+    template_obj.Template = template_dir
+    # Assign page template.
+    page_obj.Template = template_obj
     # Add the Projection views
-    FreeCAD.activeDocument().addObject("TechDraw::DrawProjGroup", "ProjGroup")
-    FreeCAD.activeDocument().__getattribute__(page_name).addView(
-        FreeCAD.activeDocument().ProjGroup
+    project_group_object = FreeCAD.activeDocument().addObject(
+        "TechDraw::DrawProjGroup", f"ProjGroup_{object.Label}"
     )
+    page_obj.addView(project_group_object)
     # Set the source of the views to be the visible object.
-    FreeCAD.activeDocument().ProjGroup.Source = FreeCAD.getDocument(
-        current_document.Name
-    ).getObject(object.Name)
-    FreeCAD.activeDocument().ProjGroup.addProjection("Front")
-    FreeCAD.activeDocument().ProjGroup.ScaleType = "Page"
-    FreeCAD.activeDocument().ProjGroup.Anchor.Direction = FreeCAD.Vector(
-        0.000, -1.000, 0.000
+    project_group_object.Source = FreeCAD.getDocument(document.Name).getObject(
+        object.Name
     )
-    FreeCAD.activeDocument().ProjGroup.Anchor.RotationVector = FreeCAD.Vector(
-        1.000, 0.000, 0.000
-    )
-    FreeCAD.activeDocument().ProjGroup.Anchor.XDirection = FreeCAD.Vector(
-        1.000, 0.000, 0.000
-    )
-    FreeCAD.activeDocument().ProjGroup.Anchor.recompute()
-    FreeCAD.ActiveDocument.recompute()
 
-    # Add views on the technical drawing
-    FreeCAD.activeDocument().ProjGroup.addProjection("Right")
-    FreeCAD.activeDocument().ProjGroup.addProjection("Top")
-    FreeCAD.activeDocument().ProjGroup.addProjection("Left")
-    FreeCAD.activeDocument().ProjGroup.addProjection("Bottom")
-    FreeCAD.activeDocument().ProjGroup.addProjection("FrontBottomLeft")
-    FreeCAD.activeDocument().ProjGroup.addProjection("FrontTopRight")
-    FreeCAD.activeDocument().ProjGroup.addProjection("FrontTopLeft")
-    FreeCAD.activeDocument().ProjGroup.addProjection("FrontBottomRight")
+    try:
+        project_group_object.addProjection("Front")
+    except TypeError:
+        FreeCAD.activeDocument().removeObject("TechDraw::DrawPage", page_name)
+        FreeCAD.activeDocument().removeObject(
+            "TechDraw::DrawSVGTemplate", f"Template_{object.Label}"
+        )
+        FreeCAD.activeDocument().removeObject(
+            "TechDraw::DrawProjGroup", f"ProjGroup_{object.Label}"
+        )
+    else:
+        project_group_object.ScaleType = "Automatic"
+        project_group_object.Anchor.Direction = FreeCAD.Vector(0.000, -1.000, 0.000)
+        project_group_object.Anchor.RotationVector = FreeCAD.Vector(1.000, 0.000, 0.000)
+        project_group_object.Anchor.XDirection = FreeCAD.Vector(1.000, 0.000, 0.000)
+        project_group_object.Anchor.recompute()
+        FreeCAD.ActiveDocument.recompute()
+
+        # Add views on the technical drawing
+        project_group_object.addProjection("Right")
+        project_group_object.addProjection("Top")
+        project_group_object.addProjection("Left")
+        project_group_object.addProjection("Bottom")
+        project_group_object.addProjection("FrontBottomLeft")
+        project_group_object.addProjection("FrontTopRight")
+        project_group_object.addProjection("FrontTopLeft")
+        project_group_object.addProjection("FrontBottomRight")
+        FreeCAD.ActiveDocument.recompute()
+
     FreeCAD.Gui.ActiveDocument.resetEdit()
+    # Clear selection
+    FreeCAD.Gui.Selection.clearSelection()
+
+
+def main():
+    """Executes the main logic of the application."""  # noqa: D401
+    if DEBUG:
+        # Clear report view in debug mode
+        FreeCADGui.getMainWindow().findChild(QtGui.QTextEdit, "Report view").clear()
+
+    # Fit view to screen
+    FreeCAD.Gui.SendMsgToActiveView("ViewFit")
+    # Set the view to be front view
+    FreeCAD.Gui.activeDocument().activeView().viewFront()
+    current_document = FreeCAD.ActiveDocument
+    visible_objects = get_visible_objects(document=current_document)
+
+    templates_dir = os.path.join(
+        FreeCAD.ConfigGet("AppHomePath"), "share", "Mod", "TechDraw", "Templates"
+    )
+    template_filename = TEMPLATES[9]
+    template_full_dir = os.path.join(templates_dir, template_filename)
+
+    for _, object in enumerate(visible_objects):
+
+        try:
+            console_debug(f"Working on {object.Label}")
+            page_name = f"Page_{object.Label}"
+            create_technical_page(
+                document=current_document,
+                object=object,
+                page_name=page_name,
+                template_dir=template_full_dir,
+            )
+        except TypeError as exec_error:
+            msg = f"Error with object {str(object.Label)}, error: {exec_error.__str__()}, "
+            msg += f"traceback: {traceback.format_exc()}"
+            console_error(msg)
+
+
+if __name__ == "__main__":
+    main()
