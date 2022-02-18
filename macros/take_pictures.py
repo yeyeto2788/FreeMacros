@@ -64,7 +64,7 @@ def main():
     current_document = FreeCAD.ActiveDocument
     FreeCADGui.ActiveDocument.ActiveView.setAnimationEnabled(False)
 
-    output_dir = os.path.join(os.path.dirname(current_document.FileName), "images")
+    output_dir = os.path.join(os.path.dirname(current_document.FileName), "Images")
 
     console_debug(f"Images will be saved at {output_dir}")
 
@@ -79,20 +79,25 @@ def main():
             FreeCADGui.SendMsgToActiveView("ViewFit")
             # Set view to take picture of
             FreeCADGui.SendMsgToActiveView(view)
-            for x, y in IMAGES_SIZES:
+            for width, height in IMAGES_SIZES:
                 # Create filename based on parameters
                 filename = f"{os.path.basename(FreeCAD.ActiveDocument.FileName)[:-6]}"
-                filename += f"_{camera_type}_{view}_{str(x)}_{str(y)}"
+                filename += f"_{camera_type}_{view}_{str(width)}x{str(height)}"
 
                 jpg_file = os.path.join(output_dir, f"{filename}.jpg")
-                FreeCADGui.ActiveDocument.ActiveView.saveImage(jpg_file, x, y, "White")
+                FreeCADGui.ActiveDocument.ActiveView.saveImage(
+                    jpg_file, width, height, "White"
+                )
                 console_debug(f"Image '{jpg_file}' created.")
 
                 png_file = os.path.join(output_dir, f"{filename}.png")
                 FreeCADGui.ActiveDocument.ActiveView.saveImage(
-                    png_file, x, y, "Transparent"
+                    png_file, width, height, "Transparent"
                 )
                 console_debug(f"Image '{png_file}' created.")
+
+    FreeCADGui.SendMsgToActiveView("ViewFit")
+    FreeCADGui.ActiveDocument.ActiveView.viewIsometric()
 
 
 if __name__ == "__main__":
