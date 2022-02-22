@@ -1,3 +1,6 @@
 {
-  "python.formatting.provider": "black"
+  "python.formatting.provider": "black",
+  "python.terminal.activateEnvironment": true,
+  "spellright.language": [],
+  "spellright.documentTypes": ["latex", "plaintext"]
 }
